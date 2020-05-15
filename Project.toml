@@ -1,0 +1,11 @@
+[deps]
+Boltzmann = "00bb91fb-75dd-5f5f-97ed-3cee78a05366"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+GR = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+RandomNumbers = "e6cf234a-135c-5ec9-84dd-332b85af5143"
+Weave = "44d3d7a6-8a23-5bf8-98c5-b353f8df5ec9"

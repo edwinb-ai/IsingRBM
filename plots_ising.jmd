@@ -1,0 +1,170 @@
+---
+author: Edwin Bedolla
+date: 15-05-2020
+title: Learning thermodynamics with Boltzmann machines (réplica parcial)
+---
+
+Este es un trabajo original de Giacomo Torlai and Roger G. Melko
+publicado en *Physical Review B*, el 17 de Octubre de 2016, que lleva
+por nombre [Learning thermodynamics with Boltzmann machines](https://doi.org/10.1103/PhysRevB.94.165134).
+Este documento es solamente un intento de reproducir parcialmente sus resultados.
+Todo el trabajo es propiedad de los autores.
+
+# Motivación
+
+- Se puede entrenar a un modelo inteligente de forma **no supervisada** para que reproduzca observables físicas (en este caso, termodinámicas).
+- Los modelos empleados no tienen que ser *cajas negras* y se puede seguir paso a paso su entrenamiento, i.e. el mecanismo bajo el cual aprende de los datos.
+
+# Propuesta
+
+- Crear datos del modelo de Ising con Hamiltoniano
+
+$$
+H_s(\sigma) = -J \sum_{\langle i,j\rangle} \sigma_i \sigma_j
+$$
+
+para diferentes valores de temperatura, $T$. Esto se hace mediante el esquema estándar
+de muestreo por MCMC (Markov Chain Monte Carlo).
+
+- Con estos datos, entrenar modelos inteligentes que generen configuraciones semejantes por cada valor de $T$.
+
+- Comparar la termodinámica entre los datos obtenidos por MCMC y los datos obtenidos del modelo inteligente.
+
+# Restricted Boltzmann Machines
+
+El modelo escogido es **Restricted Boltzmann Machines** (RBMs), que son redes neuronales
+estocásticas que consiste de *unidades visibles*, $\mathbf{v}$, y *unidades escondidas*,
+$\mathbf{h}$, las cuales están conectadas entre sí; esto es idéntico a una red neuronal.
+
+Las uniones entre cada unidad tiene un *peso* asignado, y en general se construye una matriz
+de pesos $\mathbf{W}$. Toda esta red neuronal tiene una *energía* asignada
+
+$$
+E(\mathbf{v},\mathbf{h}) = -a^T \mathbf{v} - b^T \mathbf{h} - \mathbf{v}^T \mathbf{W} \mathbf{h}
+$$
+
+Las RBMs tienen una distribución de probabilidad asociada a esta energía
+
+$$
+P_{\lambda}(\mathbf{v},\mathbf{h}) = \frac{1}{Z} e^{(-E(\mathbf{v},\mathbf{h}))}
+$$
+
+El propósito de las RBMs es aproximar la distribución de probabilidad de los datos con los cuales se entrena.
+Para encontrar esta distribución de probabilidad $P_{\lambda}(\mathbf{v},\mathbf{h})$
+se pueden factorizar las probabilidades condicionales
+
+$$
+P_{\lambda}(\mathbf{v}_j=1,\mathbf{h}) = \sigma \left( \sum_i W_ij h_i + b_j\right) \\
+P_{\lambda}(\mathbf{h}_j=1,\mathbf{v}) = \sigma \left( \sum_i W_ij v_i + a_j\right)
+$$
+
+y dado que se tienen las expresiones analíticas exactas, entonces se puede emplear [muestreo de Gibbs](https://en.wikipedia.org/wiki/Gibbs_sampling)
+para encontrar la probabilidad *a posteriori*, empleando el teorema de Bayes.
+
+Sin embargo, se necesita asegurar que se está llegando a la distribución deseada, y para esto se minimiza la *distancia* en distribuciones
+de probabilidad, llamada la **divergencia de Kullback-Liebler**
+
+$$
+KL(P_s \vert P_{\lambda}) = \sum_{\mathbf{v},\mathbf{h}} P_s(\mathbf{v},\mathbf{h})
+\log{\frac{P_s(\mathbf{v},\mathbf{h})}{P_{\lambda}(\mathbf{v},\mathbf{h})}}
+$$
+
+donde $P_s(\mathbf{v},\mathbf{h}$ es la distribución de probabilidad objetivo que se desea aproximar.
+
+## Entrenamiento de RBMs
+
+El entrenamiento se lleva a cabo empleando *descenso de gradiente estocástico* con la siguiente regla
+
+$$
+\lambda_{j} \leftarrow \lambda_{j} - \eta \nabla_{\lambda_{j}} KL(P_s \vert P_{\lambda})
+$$
+
+donde $\lambda = \{\mathbf{W}, \mathbf{a}, \mathbf{b}\}$ son los parámetros del modelo que se actualizarán en cada paso.
+
+Sin embargo, encontrar el gradiente de $\nabla_{\lambda_{j}} KL(P_s \vert P_{\lambda})$. Se han creado muchas estrategias de entrenamiento, 
+y durante un tiempo hubo mucha investigación en este ámbito, pero siempre se ha empleado la técnica llamada, en inglés, **contrastive divergence**,
+que por cuestiones de tiempo no se explicará en este documento, pero en las referencias se deja la guía diseñada por el creador de las RBMs,
+Geoffrey Hinton, para saber cómo se entrenan.
+
+# Metodología
+
+La metodología ya se había mencionado brevemente anteriormente. Consta de crear configuraciones del modelo de Ising y estas configuraciones
+se usan para entrenar, i.e. encontrar los modelos óptimos de cada RBM, para cada valor de $T$. Luego, las RBMs se emplean para generar
+nuevas configuraciones. Todos los sistemas son de $L =  6$ para un total de $N = L^2 = 36$ espínes.
+
+En el caso del método de Monte Carlo, se termalizaron los sistemas haciendo $10^8$ pasos de Monte Carlo, y luego muestreando
+cada $10^4$ durante otros $10^8$ pasos adicionales, para un total de $10^4$ configuraciones por cada valor de $T$.
+
+En el caso de las RBMs, se dejaron equilibrar las cadenas de Markov durante $500$ pasos de muestreo de Gibbs, y luego se extrajeron
+$10^4$ configuraciones para tener un conjunto comparable con el anterior.
+
+Después, se comparan observables termodinámicas para ver qué tan confiable es que un modelo inteligente aprenda a generar datos físicos
+y, sobre todo, representativos.
+
+En este documento solamente se compara la magnetización definida como
+
+$$
+m = \frac{1}{N} \sum_i \sigma_i
+$$
+
+# Resultados
+
+```julia; results = "hidden"
+using JLD2, FileIO
+using Plots
+using Printf
+pyplot()
+```
+
+```julia; echo = false; results = "hidden"
+ising_magn = Vector{Float64}(undef, 20)
+rbm_magn = Vector{Float64}(undef, 20)
+JLD2.@load "ising_magnetization.jld2" ising_magn
+JLD2.@load "rbm_magnetization.jld2" rbm_magn
+```
+
+Primero, se comparan las desviaciones, lo cual se espera que sean muy pequeñas entre el modelo de Ising con MCMC
+y los datos encontrados mediante las RBMs entrenadas.
+
+```julia
+deviations = abs.(ising_magn .- rbm_magn)
+display(deviations)
+```
+
+Como se puede ver, hay valores de $T$ donde las desviaciones son altas. Para observar mejor estas desviaciones
+se graficará la magnetización para cada conjunto de datos.
+
+```julia
+Ts = LinRange(1.2, 3.4, 20)
+plot(Ts, rbm_magn, label = "RBM", color = :black, line = (:dot, 4), marker = (:d, 12, 0.8, Plots.stroke(3, :gray)))
+plot!(Ts, ising_magn, label = "Ising", color = :orange, line = (:dot, 4), marker = (:hex, 12, 0.8, Plots.stroke(3, :gray)))
+xaxis!("T")
+yaxis!("M")
+```
+
+El resultado no es óptimo, por lo que es interesante discutir el porqué. Los siguientes puntos se pueden considerar:
+
+- Las RBMs no fueron entrenadas correctamente, lo cual se puede deber a muchos factores. Para asegurar que esto no es la razón
+del problema, se debe asegurar mediante re-muestreo (conocido como *cross-validation*) y encontrar los parámetros óptimos para el
+entrenamiento. En este caso se utilizaron aquellos que se reportan en el trabajo original.
+
+- Es posible que las configuraciones obtenidas del método por Monte Carlo puedan no ser representativas para todas las $T$.
+Esto se puede solucionar empleando métodos más robustos de muestreo, como el algoritmo de Wolff. Sin embargo, el método de Monte Carlo
+es la metodología empleada en el trabajo original, lo cual no debería de ser una razón para las desviaciones.
+
+- La implementación de las RBMs por los autores y la empleada en este documento pueden diferir, aunque se hayan seguido las mismas
+estrategias. En el caso de este documento se empleó un variación del algoritmo de entrenamiento el cual es más eficiente.
+Sin embargo, esto puede ser un problema al momento de comparar directamente con los resultados del trabajo original.
+
+# Conclusiones
+
+Se entrenaron RBMs para que generasen configuraciones del modelo de Ising sin tener que calcular directamente el Hamiltoniano.
+Al momento de realizar la comparación directamente con las observables termodinámicas obtenidas, los modelos inteligentes
+tuvieron desviaciones grandes, lo cual se puede deber a diversas razones que se han descrito anteriormente.
+
+# Referencias
+
+- **Trabajo original:** Torlai, G., & Melko, R. G. (2016). [Learning thermodynamics with Boltzmann machines](https://doi.org/10.1103/PhysRevB.94.165134). Physical Review B, 94(16), 165134.
+- **Guía de entrenamiento:** Hinton, G. E. (2012). A practical guide to training restricted Boltzmann machines. In Neural networks: Tricks of the trade (pp. 599-619). Springer, Berlin, Heidelberg.
+- **Monte Carlo para el modelo de Ising:** Binder, K., Ceperley, D. M., Hansen, J. P., Kalos, M. H., Landau, D. P., Levesque, D., ... & Weis, J. J. (2012). Monte Carlo methods in statistical physics (Vol. 7). Springer Science & Business Media.
+- **Muestreo de Gibbs:** Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A., & Rubin, D. B. (2013). Bayesian data analysis. CRC press.
