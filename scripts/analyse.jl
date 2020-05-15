@@ -89,7 +89,7 @@ rbm_magn = Vector{Float64}(undef, 20)
 for (j, T) in enumerate(Ts)
     confs = Array{Float64}(undef, L, L, 10000)
     fileising = @sprintf "ising_%.2f.jld2" T
-    @load joinpath("data", fileising) confs
+    JLD2.@load joinpath("data", fileising) confs
 
     rbm_samples = load_generate(T; n_samples = 10000)
 

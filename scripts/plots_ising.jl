@@ -13,6 +13,6 @@ display(deviations)
 
 Ts = LinRange(1.2, 3.4, 20)
 
-plot(Ts, sort!(rbm_magn; rev = true), label = "RBM")
+plot(Ts, rbm_magn, label = "RBM")
 plot!(Ts, ising_magn, label = "Ising")
 gui()
