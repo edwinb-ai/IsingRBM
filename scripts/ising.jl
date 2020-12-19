@@ -1,16 +1,8 @@
-using Pkg
-Pkg.activate("./")
 using JLD2, FileIO
-using Random
 using RandomNumbers.Xorshifts
 using ProgressMeter
 using Printf
-
-# functions to obtain neighbors of a given site i
-up(neighs, i) = neighs[1, i]
-right(neighs, i) = neighs[2, i]
-down(neighs, i) = neighs[3, i]
-left(neighs, i) = neighs[4, i]
+using Base.Threads
 
 function montecarlo(L, T)
     rng = Xoroshiro128Plus()
@@ -18,64 +10,93 @@ function montecarlo(L, T)
     # set parameters & initialize
     nsweeps = 10^8
     measure_rate = 10_000
-    β = 1 / T
+    β = 1.0 / T
     conf = rand(rng, [-1, 1], L, L)
-
-    confs = Matrix{Int64}[] # storing intermediate configurations
-
-    # build nearest neighbor lookup table
-    lattice = reshape(1:L^2, (L, L))
-    ups     = circshift(lattice, (-1, 0))
-    rights  = circshift(lattice, (0, -1))
-    downs   = circshift(lattice,(1, 0))
-    lefts   = circshift(lattice,(0, 1))
-    neighs = vcat(ups[:]',rights[:]',downs[:]',lefts[:]')
+    display(conf)
+    confs = Matrix{Int32}[]
 
     @showprogress "Equilibrating..." for i = 1:nsweeps
+    # for i = 1:nsweeps
         # sweep
-        for j = eachindex(conf)
-            # calculate energy difference
-            ΔE = 2.0 * conf[j] * (conf[up(neighs, j)] + conf[right(neighs, j)] +
-                                + conf[down(neighs, j)] + conf[left(neighs, j)])
+        for j ∈ 1:L
+            for k ∈ 1:L
+                # Periodic boundary condition
+                ip_1 = j + 1 > L ? j + 1 - L : j + 1
+                im_1 = j - 1 < 1 ? j + L - 1 : j - 1
+                jp_1 = k + 1 > L ? k + 1 - L : k + 1
+                jm_1 = k - 1 < 1 ? k + L - 1 : k - 1
 
-            # Metropolis criteria
-            if ΔE <= 0 || rand(rng) < exp(-β * ΔE)
-                conf[j] *= -1 # flip spin
+                # Change in energy
+                spin_value = conf[j, k]
+                spin_neighbor_sum = conf[im_1, k] + conf[ip_1, k] + conf[j, jp_1]
+                spin_neighbor_sum += conf[j, jm_1]
+
+                ΔE = 2.0 * spin_value * spin_neighbor_sum
+                # Metropolis criteria
+                if (ΔE <= 0) || (rand(rng) < exp(-β * ΔE))
+                    conf[j, k] *= -1 # flip sign
+                end
             end
         end
     end
 
     # walk over the lattice and propose to flip each spin `nsweeps` times
     @showprogress "Sampling..." for i = 1:nsweeps
-        # sweep
-        for j = eachindex(conf)
-            # calculate energy difference
-            ΔE = 2.0 * conf[j] * (conf[up(neighs, j)] + conf[right(neighs, j)] +
-                                + conf[down(neighs, j)] + conf[left(neighs, j)])
+    # for i = 1:nsweeps
+        for j ∈ 1:L
+            for k ∈ 1:L
+                # Periodic boundary condition
+                ip_1 = j + 1 > L ? j + 1 - L : j + 1
+                im_1 = j - 1 < 1 ? j + L - 1 : j - 1
+                jp_1 = k + 1 > L ? k + 1 - L : k + 1
+                jm_1 = k - 1 < 1 ? k + L - 1 : k - 1
 
-            # Metropolis criteria
-            if ΔE <= 0 || rand(rng) < exp(-β * ΔE)
-                conf[j] *= -1 # flip spin
+                # Change in energy
+                spin_value = conf[j, k]
+                spin_neighbor_sum = conf[im_1, k] + conf[ip_1, k] + conf[j, jp_1]
+                spin_neighbor_sum += conf[j, jm_1]
+
+                ΔE = 2.0 * spin_value * spin_neighbor_sum
+                # Metropolis criteria
+                if (ΔE <= 0) || (rand(rng) < exp(-β * ΔE))
+                    conf[j, k] *= -1 # flip sign
+                end
             end
         end
 
         # store the spin configuration
-        iszero(mod(i, measure_rate)) && push!(confs, copy(conf))
+        if iszero(mod(i, measure_rate))
+            push!(confs, copy(conf))
+        end
     end
 
     return confs
 end
 
-Ts = LinRange(1.2, 3.4, 20)
+function ising_threaded()
+    Ts = LinRange(1.2, 3.4, 20)
 
-function ising(T)
-    println("T = $T")
+    @threads for t in Ts
+        println("T = $t")
+        flush(stdout)
+        c = montecarlo(8, t)
+        confs = cat(c..., dims=3)
+        fileising = @sprintf "ising_%.2f.jld2" t
+        @save joinpath("data", fileising) confs
+        println("Done.")
+    end
+end
+
+function ising_simple()
+    t = 1.2
+    println("T = $t")
     flush(stdout)
-    c = montecarlo(7, T)
-    confs = cat(c..., dims = 3)
-    fileising = @sprintf "ising_%.2f.jld2" T
+    c = montecarlo(8, t)
+    confs = cat(c..., dims=3)
+    fileising = @sprintf "ising_%.2f.jld2" t
     @save joinpath("data", fileising) confs
     println("Done.")
 end
 
-map(ising, Ts)
+# ising_threaded()
+ising_simple()

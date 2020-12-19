@@ -1,7 +1,7 @@
 using JLD2, FileIO
 using Plots
 using Printf
-pyplot()
+gr()
 
 ising_magn = Vector{Float64}(undef, 20)
 rbm_magn = Vector{Float64}(undef, 20)

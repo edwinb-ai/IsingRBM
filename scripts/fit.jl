@@ -5,6 +5,7 @@ using JLD2, FileIO
 using Boltzmann
 
 function fit_ising(T; L = 7)
+    L2 = L^2
     # * Allocate space for the dataset
     confs = Array{Float64}(undef, L, L, 10000)
 
@@ -13,7 +14,7 @@ function fit_ising(T; L = 7)
     JLD2.@load joinpath("data", fileising) confs
 
     # * Flatten the datasets, make them a 1-D array
-    newconfs = reshape(confs, (L^2, 10000))
+    newconfs = reshape(confs, (L2, 10000))
 
     # * Change -1 to zeros
     for i = axes(newconfs, 2)
@@ -25,7 +26,7 @@ function fit_ising(T; L = 7)
     end
 
     # * Train the RBM for the corresponding temperature
-    rbm = BernoulliRBM(L^2, 32)
+    rbm = BernoulliRBM(L2, 32)
     fit(rbm, newconfs, n_epochs = 10000, batch_size = 50, randomize = true, lr = 0.01)
 
     # * Serialize and save the model
@@ -33,27 +34,7 @@ function fit_ising(T; L = 7)
     JLD2.@save joinpath("models", model_name) rbm
 end
 
-Ts = [
-    1.20,
-    1.32,
-    1.43,
-    1.55,
-    1.66,
-    1.78,
-    1.89,
-    2.01,
-    2.13,
-    2.24,
-    2.36,
-    2.47,
-    2.59,
-    2.71,
-    2.82,
-    2.94,
-    3.05,
-    3.17,
-    3.28,
-    3.40
-]
+# Ts = LinRange(1.2, 3.4, 20)
+Ts = [1.2]
 
-map(fit_ising, Ts)
+map(x -> fit_ising(x; L=8), Ts)
