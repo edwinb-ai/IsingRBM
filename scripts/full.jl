@@ -2,7 +2,7 @@ using Pkg
 Pkg.activate("./")
 
 # Total number of confs
-freq = 20_000
+freq = 10_000
 total_sweeps = 10^9
 nconfs = round(Int, total_sweeps / freq)
 # System size
