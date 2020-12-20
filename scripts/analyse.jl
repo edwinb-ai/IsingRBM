@@ -1,13 +1,12 @@
 # using Pkg
 # Pkg.activate("./")
+
 using Boltzmann
 using JLD2, FileIO
 using Random
 using RandomNumbers.Xorshifts
-using Plots
 using Printf
 using ProgressMeter
-gr()
 
 to_one(x) = x == true ? 1 : 0
 to_neg(x) = x == 0 ? 1 : -1
@@ -33,10 +32,10 @@ function load_generate(T; L=7, n_gibbs=1_000, seed=nothing, n_samples=1)
     JLD2.@load joinpath("models", model_name) rbm
 
     # * Create a random state
-    confs = Array{Float64}(undef, L, L, 10000)
+    confs = Array{Float64}(undef, L, L, n_samples)
     fileising = @sprintf "ising_%.2f.jld2" T
     @load joinpath("data", fileising) confs
-    random_sample = confs[:, :, rand(rng, 1:1000)]
+    random_sample = confs[:, :, rand(rng, 1:n_samples)]
     random_sample = reshape(random_sample, L2)
 
     @showprogress "Sampling..." for i = 1:n_samples
@@ -58,21 +57,20 @@ function load_generate(T; L=7, n_gibbs=1_000, seed=nothing, n_samples=1)
     return samples
 end
 
-function compute_values()
-    full_magnetization = Array{Vector{Float64}}(undef, 2, 20)
-    # Ts = LinRange(1.2, 3.4, 20)
-    Ts = [1.2]
-    L = 8
-    confs = Array{Float64}(undef, L, L, 10000)
-    ising_magn = Vector{Float64}(undef, 20)
-    rbm_magn = Vector{Float64}(undef, 20)
+function compute_values(;nconfs=10_000, L=8)
+    Ts = 1.2:0.1:3.4
+    n = size(Ts, 1)
+    full_magnetization = Array{Vector{Float64}}(undef, 2, n)
+    confs = Array{Float64}(undef, L, L, nconfs)
+    ising_magn = Vector{Float64}(undef, n)
+    rbm_magn = Vector{Float64}(undef, n)
 
     for (j, T) in enumerate(Ts)
-        confs = Array{Float64}(undef, L, L, 10000)
+        confs = Array{Float64}(undef, L, L, nconfs)
         fileising = @sprintf "ising_%.2f.jld2" T
         JLD2.@load joinpath("data", fileising) confs
 
-        rbm_samples = load_generate(T; L=L, n_samples=10000)
+        rbm_samples = load_generate(T; L=L, n_samples=nconfs)
 
         for i in axes(confs, 3)
             ising_magn[j] += magnetization(confs[:, :, i])
@@ -88,4 +86,4 @@ function compute_values()
     JLD2.@save joinpath("results", "rbm_magnetization.jld2") rbm_magn
 end
 
-compute_values()
+# compute_values()

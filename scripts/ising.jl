@@ -1,22 +1,24 @@
+# using Pkg
+# Pkg.activate("./")
+
 using JLD2, FileIO
 using RandomNumbers.Xorshifts
 using ProgressMeter
 using Printf
 using Base.Threads
 
-function montecarlo(L, T)
+function montecarlo(L, T; nconfs=10_000)
     rng = Xoroshiro128Plus()
 
     # set parameters & initialize
-    nsweeps = 10^8
-    measure_rate = 10_000
+    nsweeps = 10^2
+    measure_rate = nconfs
     β = 1.0 / T
     conf = rand(rng, [-1, 1], L, L)
-    display(conf)
     confs = Matrix{Int32}[]
 
-    @showprogress "Equilibrating..." for i = 1:nsweeps
-    # for i = 1:nsweeps
+    # @showprogress "Equilibrating..." for i = 1:nsweeps
+    for i = 1:nsweeps
         # sweep
         for j ∈ 1:L
             for k ∈ 1:L
@@ -41,8 +43,8 @@ function montecarlo(L, T)
     end
 
     # walk over the lattice and propose to flip each spin `nsweeps` times
-    @showprogress "Sampling..." for i = 1:nsweeps
-    # for i = 1:nsweeps
+    # @showprogress "Sampling..." for i = 1:nsweeps
+    for i = 1:nsweeps
         for j ∈ 1:L
             for k ∈ 1:L
                 # Periodic boundary condition
@@ -73,13 +75,13 @@ function montecarlo(L, T)
     return confs
 end
 
-function ising_threaded()
-    Ts = LinRange(1.2, 3.4, 20)
+function ising_threaded(nconfs, L)
+    Ts = 1.2:0.1:3.4
 
     @threads for t in Ts
         println("T = $t")
         flush(stdout)
-        c = montecarlo(8, t)
+        c = montecarlo(L, t; nconfs=nconfs)
         confs = cat(c..., dims=3)
         fileising = @sprintf "ising_%.2f.jld2" t
         @save joinpath("data", fileising) confs
@@ -87,11 +89,11 @@ function ising_threaded()
     end
 end
 
-function ising_simple()
+function ising_simple(nconfs)
     t = 1.2
     println("T = $t")
     flush(stdout)
-    c = montecarlo(8, t)
+    c = montecarlo(8, t; nconfs=nconfs)
     confs = cat(c..., dims=3)
     fileising = @sprintf "ising_%.2f.jld2" t
     @save joinpath("data", fileising) confs
@@ -99,4 +101,4 @@ function ising_simple()
 end
 
 # ising_threaded()
-ising_simple()
+# ising_simple()
