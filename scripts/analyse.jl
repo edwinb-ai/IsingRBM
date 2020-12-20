@@ -1,13 +1,3 @@
-# using Pkg
-# Pkg.activate("./")
-
-using Boltzmann
-using JLD2, FileIO
-using Random
-using RandomNumbers.Xorshifts
-using Printf
-using ProgressMeter
-
 to_one(x) = x == true ? 1 : 0
 to_neg(x) = x == 0 ? 1 : -1
 

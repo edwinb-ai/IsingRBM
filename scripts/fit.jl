@@ -1,19 +1,16 @@
-# using Pkg
-# Pkg.activate("./")
-
-using Base.Threads
-using Printf
-using JLD2, FileIO
-using Boltzmann
-
 function fit_ising(T; L=7, nconfs=10_000)
     L2 = L^2
     # * Allocate space for the dataset
-    confs = Array{Float64}(undef, L, L, nconfs)
+    # confs = Array{Float64}(undef, L, L, nconfs)
+    c = Matrix{Int32}(undef, L, L)
+    confs = Matrix{Int32}[]
 
     # * Load the datasets from their files
-    fileising = @sprintf "ising_%.2f.jld2" T
-    JLD2.@load joinpath("data", fileising) confs
+    @inbounds for i in 1:nconfs
+        fileising = @sprintf "ising_%.2f_%d.jld2" T i
+        JLD2.@load joinpath("data", fileising) c
+        push!(confs, copy(c))
+    end
 
     # * Change -1 to zeros
     broadcast!(x -> x == -1 ? 0 : 1, confs, confs)
@@ -40,7 +37,7 @@ end
 
 function fit_per_temp(nconfs, L)
     Ts = 1.2:0.1:3.4
-    @threads for t in Ts
+    for t in Ts
         fit_ising(t; L=L, nconfs=nconfs)
     end
 end
