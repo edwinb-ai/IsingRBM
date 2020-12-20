@@ -1,10 +1,6 @@
-function montecarlo!(L, T, conf; nconfs=10_000)
-    rng = Xoroshiro128Plus()
-
+@everywhere function montecarlo!(L, T, conf, rng; nconfs=10_000)
     # set parameters & initialize
-    measure_rate = nconfs
     β = 1.0 / T
-    conf = rand(rng, [-1, 1], L, L)
 
     for j ∈ 1:L
         for k ∈ 1:L
@@ -28,46 +24,17 @@ function montecarlo!(L, T, conf; nconfs=10_000)
     end
 end
 
-function ising_threaded(nconfs, L, sweeps)
+@everywhere function ising_threaded(nconfs, L, sweeps)
     Ts = 1.2:0.1:3.4
-    println("T = $t")
-    flush(stdout)
     c = Matrix{Int32}(undef, L, L)
 
-    @threads for t in Ts
-        println("Equilibrating...")
-        flush(stdout)
-        @inbounds for _ in 1:sweeps
-            montecarlo!(L, t, c; nconfs=nconfs)
-        end
+    # @threads for t in Ts
+    rng = Xoroshiro128Plus()
+    rand!(rng, c, [-1, 1])
 
-        println("Sampling...")
-        flush(stdout)
-
-        j = 0
-        @inbounds for i in 1:sweeps
-            montecarlo!(L, t, c; nconfs=nconfs)
-            if iszero(mod(i, nconfs))
-                j += 1
-                fileising = @sprintf "ising_%.2f_%d.jld2" t j
-                @save joinpath("data", fileising) c
-            end
-        end
-        println("Done.")
-        flush(stdout)
-    end
-end
-
-function ising_simple(nconfs, L, sweeps)
-    t = 1.2
     println("T = $t")
-    flush(stdout)
-    c = Matrix{Int32}(undef, L, L)
-
-    println("Equilibrating...")
-    flush(stdout)
-    @inbounds for _ in 1:sweeps
-        montecarlo!(L, t, c; nconfs=nconfs)
+    @showprogress "Equilibrating..." for _ in 1:sweeps
+        montecarlo!(L, t, c, rng; nconfs=nconfs)
     end
 
     println("Sampling...")
@@ -75,11 +42,41 @@ function ising_simple(nconfs, L, sweeps)
 
     j = 0
     @inbounds for i in 1:sweeps
-        montecarlo!(L, t, c; nconfs=nconfs)
+        montecarlo!(L, t, c, rng; nconfs=nconfs)
         if iszero(mod(i, nconfs))
             j += 1
             fileising = @sprintf "ising_%.2f_%d.jld2" t j
-            @save joinpath("data", fileising) c
+            @save joinpath("data", fileising) copy(c)
+        end
+    end
+    println("Done.")
+    flush(stdout)
+    # end
+end
+
+@everywhere function ising_simple(nconfs, L, sweeps, t)
+    # t = 1.2
+    c = Matrix{Int32}(undef, L, L)
+
+    # @threads for t in Ts
+    rng = Xoroshiro128Plus()
+    rand!(rng, c, [-1, 1])
+
+    println("T = $t")
+    @showprogress "Equilibrating..." for _ in 1:sweeps
+        montecarlo!(L, t, c, rng; nconfs=nconfs)
+    end
+
+    println("Sampling...")
+    flush(stdout)
+
+    j = 0
+    @inbounds for i in 1:sweeps
+        montecarlo!(L, t, c, rng; nconfs=nconfs)
+        if iszero(mod(i, nconfs))
+            j += 1
+            fileising = @sprintf "ising_%.2f_%d.jld2" t j
+            @save joinpath("data", fileising) copy(c)
         end
     end
     println("Done.")

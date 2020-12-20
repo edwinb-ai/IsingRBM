@@ -1,4 +1,4 @@
-function fit_ising(T; L=7, nconfs=10_000)
+@everywhere function fit_ising(T; L=7, nconfs=10_000)
     L2 = L^2
     # * Allocate space for the dataset
     # confs = Array{Float64}(undef, L, L, nconfs)
@@ -34,12 +34,3 @@ function fit_ising(T; L=7, nconfs=10_000)
     model_name = @sprintf "model_%.2f.jld2" T
     JLD2.@save joinpath("models", model_name) rbm
 end
-
-function fit_per_temp(nconfs, L)
-    Ts = 1.2:0.1:3.4
-    for t in Ts
-        fit_ising(t; L=L, nconfs=nconfs)
-    end
-end
-
-# fit_per_temp()
