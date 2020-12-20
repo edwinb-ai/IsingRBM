@@ -22,7 +22,7 @@ L = 8
 pmap(x -> ising_simple(freq, L, total_sweeps, x), Ts)
 # Now fit the RBMs
 @everywhere include(joinpath("scripts", "fit.jl"))
-pmap(x -> fit_ising(x; L=L, nconfs=nconfs))
+pmap(x -> fit_ising(x; L=L, nconfs=nconfs), Ts)
 
 # We now analyse everything
 include("analyse.jl")
