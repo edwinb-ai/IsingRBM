@@ -7,11 +7,10 @@ using ProgressMeter
 using Printf
 using Base.Threads
 
-function montecarlo(L, T; nconfs=10_000)
+function montecarlo(L, T; nconfs=10_000, nsweeps=10^6)
     rng = Xoroshiro128Plus()
 
     # set parameters & initialize
-    nsweeps = 10^2
     measure_rate = nconfs
     β = 1.0 / T
     conf = rand(rng, [-1, 1], L, L)
@@ -75,13 +74,13 @@ function montecarlo(L, T; nconfs=10_000)
     return confs
 end
 
-function ising_threaded(nconfs, L)
+function ising_threaded(nconfs, L, sweeps)
     Ts = 1.2:0.1:3.4
 
     @threads for t in Ts
         println("T = $t")
         flush(stdout)
-        c = montecarlo(L, t; nconfs=nconfs)
+        c = montecarlo(L, t; nconfs=nconfs, nsweeps=sweeps)
         confs = cat(c..., dims=3)
         fileising = @sprintf "ising_%.2f.jld2" t
         @save joinpath("data", fileising) confs
